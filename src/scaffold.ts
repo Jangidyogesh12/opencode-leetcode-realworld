@@ -1,7 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getLanguage, normalizeLanguage } from "./languages";
+import { getLanguage, normalizeLanguage, type LanguageContext } from "./languages";
 import { assertNoLeak } from "./patterns";
+import { schemaFromSamples } from "./schema";
 import type { FileEntry, LanguageId, ScaffoldResult, ScaffoldSpec, TestCase } from "./types";
 
 function kebab(input: string): string {
@@ -251,7 +252,17 @@ function casesFile(cases: TestCase[]): string {
 
 function buildFiles(spec: ScaffoldSpec, names: ResolvedNames, language: LanguageId): FileEntry[] {
   const adapter = getLanguage(language);
-  const ctx = { projectName: names.projectName, functionName: names.functionName, title: names.title };
+  const cases = [...(spec.publicTests ?? []), ...(spec.hiddenTests ?? [])];
+  const first = cases[0];
+  const ctx: LanguageContext = {
+    projectName: names.projectName,
+    functionName: names.functionName,
+    title: names.title,
+    input: schemaFromSamples(cases.map((test) => test.input)),
+    output: schemaFromSamples(cases.map((test) => test.expected)),
+    inputExample: first?.input ?? null,
+    outputExample: first?.expected ?? null,
+  };
 
   const files: FileEntry[] = [
     { relative: "README.md", contents: readmeFor(names, spec, language) },

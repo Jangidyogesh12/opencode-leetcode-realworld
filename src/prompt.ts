@@ -88,7 +88,12 @@ Call the tool \`leetcode_scaffold\` with a spec containing:
   "javascript", "python", "ruby", "php", "go", "rust", "csharp", "swift")
 - requirements: concrete, testable bullet points
 - edgeCases: tricky situations the solution must handle
-- starterCode: optional; otherwise a TODO stub is generated
+- Do NOT provide starterCode. Omit it so the plugin can generate a starter that
+  reflects the real types: type-safe languages get typed interfaces/structs and a
+  typed signature; dynamic languages get a documented input/output format comment.
+  The generated types are inferred from your publicTests/hiddenTests, so make the
+  first few cases representative of the full input shape (and vary fields so
+  optional ones are detected).
 - publicTests: 5-8 visible cases that illustrate the contract
 - hiddenTests: 6-12 acceptance cases, including edge cases, boundary values, an
   empty/degenerate input, and at least one larger input

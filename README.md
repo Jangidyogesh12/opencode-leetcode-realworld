@@ -182,6 +182,43 @@ node tests/runner.mjs            # all cases
 node tests/runner.mjs --public   # visible cases only
 ```
 
+## Typed starters
+
+The starter file is generated from your test cases, so the input/output contract
+is explicit before you write any logic:
+
+- **Type-safe languages** (`typescript`, `go`, `rust`, `csharp`, `swift`) get real
+  type declarations inferred from the sample inputs/outputs — an interface /
+  struct / class per object, with nested objects and arrays typed too — plus a
+  typed function signature. Your editor autocompletes `payload.<field>`.
+- **Dynamic languages** (`javascript`, `python`, `ruby`, `php`) — and Swift when a
+  shape can't be expressed statically — get a commented input/output format with a
+  concrete example instead.
+
+Example (TypeScript), generated from input `{ "values": [1,2,3] }` -> output `[3,2,1]`:
+
+```ts
+interface Payload {
+  values: number[];
+}
+
+function solve(payload: Payload): number[] {
+  throw new Error("Not implemented: solve");
+}
+```
+
+Example (Python):
+
+```python
+# Input format:  { values: number[] }
+# Input example: {"values":[1,2,3]}
+# Output format: number[]
+# Output example: [3,2,1]
+
+def solve(payload):
+    raise NotImplementedError("Not implemented: solve")
+```
+
 ## Running from source
 
 For plugin development, clone the repo and open opencode inside it — files under
@@ -234,6 +271,7 @@ src/
   index.ts      plugin entry: tools, guard hooks, command registration
   leetcode.ts   API client + normalizer (handles endpoint shape differences)
   languages.ts  per-language adapters: starter, build, run commands
+  schema.ts     input/output schema inference + type generation
   patterns.ts   topic -> domain seeds, leak detection
   scaffold.ts   deterministic project writer (any supported language)
   guard.ts      protected-path detection

@@ -1,6 +1,6 @@
 {
   "name": "opencode-leetcode-realworld",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "OpenCode plugin that turns a LeetCode problem into a realistic software-engineering assignment, so you practice applying the underlying algorithm instead of solving the puzzle.",
   "type": "module",
   "license": "MIT",
