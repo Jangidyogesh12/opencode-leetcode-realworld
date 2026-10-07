@@ -59,6 +59,10 @@ describe("scaffold", () => {
 
       const readme = await readFile(path.join(result.outDir, "README.md"), "utf8");
       const project = await readFile(path.join(result.outDir, "PROJECT.md"), "utf8");
+      expect(project).toContain("## Example input / output");
+      expect(project).toContain("Example 1: drops duplicates");
+      expect(project).toContain("**Input**");
+      expect(project).toContain("**Output**");
       for (const visible of [readme, project]) {
         const lowered = visible.toLowerCase();
         expect(lowered).not.toContain("leetcode");

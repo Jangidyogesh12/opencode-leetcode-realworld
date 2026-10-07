@@ -130,6 +130,29 @@ function edgeCaseSection(spec: ScaffoldSpec): string {
   return `## Edge cases to handle\n\n${edgeCases.map((edge) => `- ${edge}`).join("\n")}\n`;
 }
 
+function exampleSection(spec: ScaffoldSpec): string {
+  const tests = spec.publicTests ?? [];
+  if (tests.length === 0) return "";
+  const blocks = tests.slice(0, 3).map((test, index) => {
+    const input = json(test.input);
+    const output = json(test.expected);
+    return `### Example ${index + 1}: ${test.name}
+
+**Input**
+
+\`\`\`json
+${input}
+\`\`\`
+
+**Output**
+
+\`\`\`json
+${output}
+\`\`\``;
+  });
+  return `## Example input / output\n\nUse these to derive the logic.\n\n${blocks.join("\n\n")}\n`;
+}
+
 function readmeFor(names: ResolvedNames, spec: ScaffoldSpec, language: LanguageId): string {
   const adapter = getLanguage(language);
   const source = `src/solution.${adapter.extension}`;
@@ -176,6 +199,7 @@ function projectDoc(spec: ScaffoldSpec, names: ResolvedNames, language: Language
 
 ${spec.scenario.trim()}
 
+${exampleSection(spec)}
 ${requirementsSection(spec)}
 ${edgeCaseSection(spec)}
 ## Interface
