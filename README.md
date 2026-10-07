@@ -1,5 +1,7 @@
 # opencode-leetcode-realworld
 
+[![npm version](https://img.shields.io/npm/v/opencode-leetcode-realworld.svg)](https://www.npmjs.com/package/opencode-leetcode-realworld)
+
 An [opencode](https://opencode.ai) plugin that turns a LeetCode problem into a
 **realistic software-engineering assignment**.
 
@@ -13,6 +15,49 @@ and a test suite. The original problem is never shown to you.
 /practice hard graph              # difficulty + tags
 /practice two-sum                  # a specific problem
 /practice medium dynamic-programming python
+```
+
+## Install
+
+Add the plugin to your `opencode.json` and restart opencode:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-leetcode-realworld"]
+}
+```
+
+That's all you have to do. **You do not run `npm install` yourself** — opencode
+reads the `plugin` list on startup and installs the package automatically with
+Bun (cached in `~/.cache/opencode/node_modules/`). Just naming it in the config is
+enough; the plugin then registers the `/practice` command on its own.
+
+Prefer not to edit the file by hand? Let opencode do it:
+
+```bash
+opencode plugin opencode-leetcode-realworld
+```
+
+Use the project `opencode.json` to enable it for one repo, or
+`~/.config/opencode/opencode.json` to enable it everywhere.
+
+Confirm it loaded:
+
+```bash
+opencode debug config   # look for a "practice" command
+```
+
+### Requirements
+
+- [opencode](https://opencode.ai) 1.x
+- Node.js 18+ — the test runner uses Node no matter which language you pick
+- The toolchain for your chosen language (see [Supported languages](#supported-languages))
+
+Then, in opencode:
+
+```
+/practice
 ```
 
 ## Usage
@@ -105,6 +150,8 @@ they tend to produce:
 ```
 /practice
    │
+   ├─ (agent)             if language/difficulty are missing, ask you via the `question` tool
+   │
    ├─ leetcode_fetch      fetch a problem from the LeetCode API (private reasoning input)
    │
    ├─ (agent)             derive the principle -> invent a real-world scenario
@@ -135,24 +182,11 @@ node tests/runner.mjs            # all cases
 node tests/runner.mjs --public   # visible cases only
 ```
 
-## Install
+## Running from source
 
-### Local (development)
-
-Clone/copy this repo, then open opencode inside it. Files under
-`.opencode/plugins/` and `.opencode/commands/` are auto-loaded.
-
-### From npm (once published)
-
-```jsonc
-// opencode.json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-leetcode-realworld"]
-}
-```
-
-The plugin registers the `/practice` command itself, so no extra config is needed.
+For plugin development, clone the repo and open opencode inside it — files under
+`.opencode/plugins/` are auto-loaded. See [Development](#development) for the test
+and typecheck commands.
 
 ## Tools
 
