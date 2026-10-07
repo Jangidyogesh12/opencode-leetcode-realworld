@@ -38,7 +38,12 @@ export const LeetCodeRealWorld: Plugin = async ({ client, directory }) => {
         .describe("How to choose the problem"),
       idOrSlug: tool.schema.string().optional().describe("Problem id or slug (required for mode=specific)"),
       difficulty: tool.schema.enum(["Easy", "Medium", "Hard"]).optional(),
-      tags: tool.schema.array(tool.schema.string()).optional().describe("Topic tags, e.g. ['graph']"),
+      tags: tool.schema
+        .array(tool.schema.string())
+        .optional()
+        .describe(
+          "Topic tag slugs to constrain the problem, e.g. ['array'] or ['dynamic-programming']",
+        ),
     },
     async execute(args, context) {
       const problem = await fetchProblem({

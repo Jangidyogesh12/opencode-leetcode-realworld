@@ -29,9 +29,18 @@ puzzle.
 Arguments: "$ARGUMENTS"
 Recognise any of these (all optional):
 - difficulty: easy | medium | hard
-- tags: comma-separated topic tags, e.g. "dynamic-programming,graph"
+- tags: topic names or slugs, e.g. "graph" or "dynamic-programming,sliding-window"
 - a specific problem id or slug, e.g. "two-sum" or "1"
 - language: a supported language name or alias (below)
+
+Mapping rules:
+- A word that names a topic (array, string, graph, tree, dp/dynamic-programming,
+  sliding-window, two-pointers, greedy, ...) is a TAG. Pass it to \`leetcode_fetch\`
+  as \`tags\` (an array of slugs, e.g. \`["array"]\`).
+- Only pass \`idOrSlug\` when the argument is a number or a known problem slug
+  (e.g. "1", "two-sum"). Never pass a topic name as \`idOrSlug\`.
+- When the user gives a tag, it MUST be respected. After fetching, if the problem's
+  topics do not include the requested tag, the fetch is wrong: retry with the tag.
 
 ## 2. Ask when unclear (use the \`question\` tool)
 Supported languages: ${SUPPORTED_LANGUAGES.join(", ")}.
@@ -47,9 +56,11 @@ If the user did specify values, skip the corresponding question. Only ask at all
 when something is missing.
 
 ## 3. Fetch the source problem (private)
-Call the \`leetcode_fetch\` tool with the difficulty/tags/slug. The fetched
-statement is for YOUR reasoning only. Never paste it, paraphrase it closely, or
-name its source anywhere in the generated project.
+Call the \`leetcode_fetch\` tool with the difficulty, and pass any requested topic
+as \`tags\` (array of slugs) — not as \`idOrSlug\`. Verify the returned topics
+include every requested tag; if not, retry. The fetched statement is for YOUR
+reasoning only. Never paste it, paraphrase it closely, or name its source anywhere
+in the generated project.
 
 ## 4. Derive the principle
 Identify the underlying algorithmic idea (e.g. sliding window, heap-based

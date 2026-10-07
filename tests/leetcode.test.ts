@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { isProtectedReference } from "../src/guard";
-import { normalizeProblem } from "../src/leetcode";
+import { fetchProblem, normalizeProblem, slugifyTag } from "../src/leetcode";
 import { assertNoLeak, domainSeedsFor, findLeaks } from "../src/patterns";
 import type { ScaffoldSpec } from "../src/types";
 
@@ -93,5 +93,53 @@ describe("guard", () => {
   it("allows ordinary project files", () => {
     expect(isProtectedReference("src/deduper.ts")).toBe(false);
     expect(isProtectedReference("tests/public/core.test.ts")).toBe(false);
+  });
+});
+
+describe("fetchProblem tags", () => {
+  const TWO_SUM = {
+    questionId: "1",
+    questionFrontendId: "1",
+    title: "Two Sum",
+    titleSlug: "two-sum",
+    difficulty: "Easy",
+    content: "<p>Given an array of integers nums and a target, return indices.</p>",
+    topicTags: [{ name: "Array" }, { name: "Hash Table" }],
+  };
+
+  it("slugifies tags", () => {
+    expect(slugifyTag("Dynamic Programming")).toBe("dynamic-programming");
+    expect(slugifyTag("Hash Table")).toBe("hash-table");
+  });
+
+  it("uses /problems/tag for tags (not the ignored tags query param)", async () => {
+    const original = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: unknown) => {
+      const value = String(url);
+      calls.push(value);
+      if (value.includes("/problems/tag/array")) {
+        return new Response(
+          JSON.stringify({
+            tag: "array",
+            problems: [{ title_slug: "two-sum", difficulty: "Easy", paid_only: false }],
+          }),
+          { status: 200 },
+        );
+      }
+      if (value.includes("/problem/two-sum")) {
+        return new Response(JSON.stringify(TWO_SUM), { status: 200 });
+      }
+      return new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+    try {
+      const problem = await fetchProblem({ difficulty: "Easy", tags: ["array"] });
+      expect(problem.slug).toBe("two-sum");
+      expect(calls.some((call) => call.includes("/problems/tag/array"))).toBe(true);
+      // The bug was sending `tags=array` to /random or /problems/filter, which ignore it.
+      expect(calls.some((call) => call.includes("tags=array"))).toBe(false);
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });

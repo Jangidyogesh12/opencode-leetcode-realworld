@@ -157,19 +157,29 @@ export async function getProblem(idOrSlug: string, signal?: AbortSignal): Promis
   return normalizeProblem(raw, preferredSlug(idOrSlug));
 }
 
-interface RandomProblem {
+interface ProblemListEntry {
   title_slug?: string;
   titleSlug?: string;
+  difficulty?: string;
+  paid_only?: boolean;
+  isPaidOnly?: boolean;
+}
+
+export function slugifyTag(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export async function getRandom(
-  opts: { difficulty?: string; tags?: string[]; signal?: AbortSignal } = {},
+  opts: { difficulty?: string; signal?: AbortSignal } = {},
 ): Promise<NormalizedProblem> {
   const params = new URLSearchParams();
   if (opts.difficulty) params.set("difficulty", opts.difficulty);
-  if (opts.tags?.length) params.set("tags", opts.tags.join(","));
   const query = params.toString();
-  const raw = await getJson<RandomProblem>(`/random${query ? `?${query}` : ""}`, opts.signal);
+  const raw = await getJson<ProblemListEntry>(`/random${query ? `?${query}` : ""}`, opts.signal);
   const slug = raw.title_slug ?? raw.titleSlug;
   if (!slug) throw new Error("LeetCode API /random did not return a problem slug.");
   return getProblem(slug, opts.signal);
@@ -181,20 +191,102 @@ export async function getDaily(signal?: AbortSignal): Promise<NormalizedProblem>
 }
 
 interface FilterResponse {
-  problems?: Array<Record<string, unknown>>;
+  problems?: ProblemListEntry[];
+}
+
+/**
+ * IMPORTANT: `/problems/filter` and `/random` silently IGNORE the `tags` query
+ * parameter, so the only endpoint that actually filters by topic is
+ * `/problems/tag/{slug}`. Difficulty still has to be applied client-side there.
+ */
+interface TagResponse {
+  tag?: string;
+  problems?: ProblemListEntry[];
+}
+
+async function listByTag(
+  tag: string,
+  difficulty: string | undefined,
+  signal: AbortSignal | undefined,
+  pages = 4,
+): Promise<ProblemListEntry[]> {
+  const results: ProblemListEntry[] = [];
+  const seen = new Set<string>();
+  for (let page = 0; page < pages; page += 1) {
+    const query = new URLSearchParams({ limit: "50", skip: String(page * 50) });
+    const raw = await getJson<TagResponse>(
+      `/problems/tag/${encodeURIComponent(tag)}?${query.toString()}`,
+      signal,
+    );
+    const problems = raw.problems ?? [];
+    if (problems.length === 0) break;
+    for (const problem of problems) {
+      const slug = String(problem.title_slug ?? problem.titleSlug ?? "");
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      if (problem.paid_only || problem.isPaidOnly) continue;
+      if (
+        difficulty &&
+        String(problem.difficulty ?? "").toLowerCase() !== difficulty.toLowerCase()
+      ) {
+        continue;
+      }
+      results.push(problem);
+    }
+    if (problems.length < 50) break;
+  }
+  return results;
+}
+
+function matchesTags(problem: NormalizedProblem, tags: string[]): boolean {
+  const present = problem.topics.map(slugifyTag);
+  // Some LeetCode tag slugs differ from the topic label, e.g. tag "graph" ->
+  // topic "Graph Theory" (slug "graph-theory"). Allow prefix aliases both ways.
+  return tags.every((tag) =>
+    present.some(
+      (topic) => topic === tag || topic.startsWith(`${tag}-`) || tag.startsWith(`${topic}-`),
+    ),
+  );
+}
+
+async function fetchByTags(
+  tags: string[],
+  difficulty: string | undefined,
+  signal?: AbortSignal,
+): Promise<NormalizedProblem> {
+  const candidates = await listByTag(tags[0]!, difficulty, signal);
+  if (candidates.length === 0) {
+    throw new Error(
+      `No ${difficulty ?? "matching"} problems found for tag "${tags[0]}". ` +
+        "Check the tag slug (e.g. array, hash-table, dynamic-programming).",
+    );
+  }
+  const strict = tags.length > 1;
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+  const attempts = Math.min(shuffled.length, 12);
+  let fallback: NormalizedProblem | undefined;
+  for (let index = 0; index < attempts; index += 1) {
+    const slug = String(shuffled[index]!.title_slug ?? shuffled[index]!.titleSlug ?? "");
+    if (!slug) continue;
+    const problem = await getProblem(slug, signal);
+    if (!isUsableProblem(problem)) continue;
+    fallback = fallback ?? problem;
+    if (!strict || matchesTags(problem, tags)) return problem;
+  }
+  if (fallback) return fallback;
+  throw new Error(`Could not find a usable problem for tag "${tags[0]}".`);
 }
 
 export async function getFiltered(
-  opts: { difficulty?: string; tags?: string[]; limit?: number; signal?: AbortSignal } = {},
+  opts: { difficulty?: string; limit?: number; signal?: AbortSignal } = {},
 ): Promise<NormalizedProblem> {
   const params = new URLSearchParams();
   if (opts.difficulty) params.set("difficulty", opts.difficulty);
-  if (opts.tags?.length) params.set("tags", opts.tags.join(","));
   params.set("limit", String(opts.limit ?? 20));
   const raw = await getJson<FilterResponse>(`/problems/filter?${params.toString()}`, opts.signal);
   const candidates = raw.problems ?? [];
   if (candidates.length === 0) throw new Error("LeetCode API returned no problems for the given filter.");
-  const choice = candidates[Math.floor(Math.random() * candidates.length)] as Record<string, unknown>;
+  const choice = candidates[Math.floor(Math.random() * candidates.length)]!;
   const slug = String(choice.title_slug ?? choice.titleSlug ?? "");
   if (!slug) throw new Error("Filtered problem is missing a slug.");
   return getProblem(slug, opts.signal);
@@ -202,32 +294,27 @@ export async function getFiltered(
 
 export async function fetchProblem(options: FetchOptions = {}): Promise<NormalizedProblem> {
   const mode = options.mode ?? "random";
-  switch (mode) {
-    case "specific": {
-      if (!options.idOrSlug) throw new Error("`idOrSlug` is required when mode is `specific`.");
-      return getProblem(options.idOrSlug, options.signal);
-    }
-    case "daily": {
-      const daily = await getDaily(options.signal);
-      if (isUsableProblem(daily)) return daily;
-      return pickUsable(() =>
-        getRandom({ difficulty: options.difficulty, tags: options.tags, signal: options.signal }),
-      );
-    }
-    case "filter":
-      return pickUsable(() =>
-        getFiltered({
-          difficulty: options.difficulty,
-          tags: options.tags,
-          signal: options.signal,
-        }),
-      );
-    case "random":
-    default:
-      return pickUsable(() =>
-        getRandom({ difficulty: options.difficulty, tags: options.tags, signal: options.signal }),
-      );
+  const tags = (options.tags ?? []).map(slugifyTag).filter((tag) => tag.length > 0);
+
+  if (mode === "specific") {
+    if (!options.idOrSlug) throw new Error("`idOrSlug` is required when mode is `specific`.");
+    return getProblem(options.idOrSlug, options.signal);
   }
+
+  if (mode === "daily" && tags.length === 0) {
+    const daily = await getDaily(options.signal);
+    if (isUsableProblem(daily)) return daily;
+    return pickUsable(() => getRandom({ difficulty: options.difficulty, signal: options.signal }));
+  }
+
+  if (tags.length > 0) {
+    return fetchByTags(tags, options.difficulty, options.signal);
+  }
+
+  if (mode === "filter") {
+    return pickUsable(() => getFiltered({ difficulty: options.difficulty, signal: options.signal }));
+  }
+  return pickUsable(() => getRandom({ difficulty: options.difficulty, signal: options.signal }));
 }
 
 export interface TagInfo {
