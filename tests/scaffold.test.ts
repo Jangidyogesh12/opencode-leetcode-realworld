@@ -117,4 +117,113 @@ describe("scaffold", () => {
       ).rejects.toThrow(/Unsupported language/);
     });
   });
+
+  it("creates a multi-file project-mode assignment", async () => {
+    await withTempDir(async (dir) => {
+      const result = await scaffold(
+        {
+          mode: "project",
+          title: "Webhook Dedup Service",
+          scenario: "A billing service receives duplicate webhook deliveries and must drop them.",
+          pattern: "hash set",
+          language: "typescript",
+          task: "Implement `dedupe` in `src/service.ts`.",
+          runCommand: "node --experimental-strip-types src/cli.ts",
+          files: [
+            {
+              path: "src/service.ts",
+              content:
+                "export function dedupe(ids: string[]): string[] {\n  // TODO: implement\n  throw new Error('TODO');\n}\n",
+            },
+            {
+              path: "src/cli.ts",
+              content:
+                "import { readFileSync } from 'node:fs';\nimport { dedupe } from './service';\nconst ids = JSON.parse(readFileSync(0, 'utf8'));\nprocess.stdout.write(JSON.stringify(dedupe(ids)));\n",
+            },
+          ],
+          publicTests: [{ name: "drops dupes", input: ["a", "a", "b"], expected: ["a", "b"] }],
+          hiddenTests: [{ name: "order", input: ["b", "a", "b"], expected: ["b", "a"] }],
+        },
+        { directory: dir },
+      );
+
+      expect(result.mode).toBe("project");
+      for (const file of ["src/service.ts", "src/cli.ts", "tests/runner.mjs", "harness.json"]) {
+        expect(result.files).toContain(file);
+      }
+      expect(result.files).not.toContain("src/solution.ts");
+      const harness = JSON.parse(await readFile(path.join(result.outDir, "harness.json"), "utf8"));
+      expect(harness.run).toContain("src/cli.ts");
+      const task = await readFile(path.join(result.outDir, "PROJECT.md"), "utf8");
+      expect(task).toContain("src/service.ts");
+    });
+  });
+
+  it("creates an HTTP project with a server harness", async () => {
+    await withTempDir(async (dir) => {
+      const result = await scaffold(
+        {
+          mode: "project",
+          stack: "express",
+          title: "Events API",
+          scenario: "Expose an endpoint that dedupes incoming events.",
+          pattern: "hash set",
+          language: "typescript",
+          startCommand: "node --experimental-strip-types src/server.ts",
+          port: 4123,
+          healthPath: "/health",
+          files: [{ path: "src/server.ts", content: "// TODO\n" }],
+          publicTests: [
+            {
+              name: "dedupes",
+              method: "POST",
+              path: "/events",
+              input: { ids: ["a", "a", "b"] },
+              expected: ["a", "b"],
+              status: 200,
+            },
+          ],
+          hiddenTests: [],
+        },
+        { directory: dir },
+      );
+
+      expect(result.kind).toBe("http");
+      const harness = JSON.parse(await readFile(path.join(result.outDir, "harness.json"), "utf8"));
+      expect(harness.kind).toBe("http");
+      expect(harness.start).toContain("src/server.ts");
+      expect(harness.port).toBe(4123);
+      expect(harness.run).toBeNull();
+      const cases = JSON.parse(
+        await readFile(path.join(result.outDir, "tests/public/cases.json"), "utf8"),
+      );
+      expect(cases[0].method).toBe("POST");
+    });
+  });
+
+  it("rejects project mode for non-project languages and missing pieces", async () => {
+    await withTempDir(async (dir) => {
+      await expect(
+        scaffold(
+          {
+            mode: "project",
+            title: "X",
+            scenario: "y",
+            pattern: "z",
+            language: "go",
+            files: [{ path: "main.go", content: "package main" }],
+            runCommand: "go run .",
+          },
+          { directory: dir },
+        ),
+      ).rejects.toThrow(/only supported/i);
+
+      await expect(
+        scaffold(
+          { mode: "project", title: "X", scenario: "y", pattern: "z", language: "typescript" },
+          { directory: dir },
+        ),
+      ).rejects.toThrow(/requires a `files`/);
+    });
+  });
 });

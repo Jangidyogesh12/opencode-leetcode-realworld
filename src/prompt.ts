@@ -13,6 +13,18 @@ export const SUPPORTED_LANGUAGES = [
   "Swift",
 ];
 
+/** Languages that can receive a full multi-file project. */
+export const PROJECT_LANGUAGES = ["TypeScript", "Python", "Rust"];
+
+/** Stacks offered in project mode. */
+export const STACKS = [
+  "Vanilla (no framework)",
+  "Express API (Node)",
+  "Next.js (React)",
+  "FastAPI (Python)",
+  "Agent decides",
+];
+
 /**
  * The `/practice` command prompt. It orchestrates the two plugin tools and is
  * deliberately opinionated: the whole value of this plugin is that the learner
@@ -32,92 +44,111 @@ Recognise any of these (all optional):
 - tags: topic names or slugs, e.g. "graph" or "dynamic-programming,sliding-window"
 - a specific problem id or slug, e.g. "two-sum" or "1"
 - language: a supported language name or alias (below)
+- scope: "single" | "mini" | "full"
+- stack: a stack name, e.g. "express", "nextjs", "fastapi", "vanilla"
 
 Mapping rules:
 - A word that names a topic (array, string, graph, tree, dp/dynamic-programming,
   sliding-window, two-pointers, greedy, ...) is a TAG. Pass it to \`leetcode_fetch\`
-  as \`tags\` (an array of slugs, e.g. \`["array"]\`).
-- Only pass \`idOrSlug\` when the argument is a number or a known problem slug
-  (e.g. "1", "two-sum"). Never pass a topic name as \`idOrSlug\`.
-- When the user gives a tag, it MUST be respected. After fetching, if the problem's
-  topics do not include the requested tag, the fetch is wrong: retry with the tag.
+  as \`tags\` (array of slugs).
+- Only pass \`idOrSlug\` for a number or known slug (e.g. "1", "two-sum").
+- When a tag is given it MUST be respected; if the fetched topics lack it, retry.
 
-## 2. Ask when unclear (use the \`question\` tool)
-Supported languages: ${SUPPORTED_LANGUAGES.join(", ")}.
+## 2. Ask how they want to start (use the \`question\` tool)
 
-- If the user did NOT specify a language, call the \`question\` tool and ask which
-  language they want to practice, offering these as options:
-  ${SUPPORTED_LANGUAGES.map((name) => `"${name}"`).join(", ")}.
-- If the user did NOT specify a difficulty, include a second question in the SAME
-  \`question\` call offering "Easy", "Medium" (recommended), and "Hard".
-- Wait for the answers. Do not guess and do not default silently.
+Step A — if language and/or difficulty are missing, ask in one \`question\` call.
+Languages: ${SUPPORTED_LANGUAGES.join(", ")}. Difficulty options: "Easy",
+"Medium" (recommended), "Hard".
 
-If the user did specify values, skip the corresponding question. Only ask at all
-when something is missing.
+Step B — scope. Full projects are only for ${PROJECT_LANGUAGES.join(", ")}.
+- If the language is one of those AND scope was not given, ask a SECOND question
+  "How do you want to start?" with: "Quick exercise" (one function),
+  "Mini project" (~3-6 files), "Fuller project" (~6-15 files).
+- Otherwise skip it.
+
+Step C — stack. Only when the scope is a project (not "Quick exercise"):
+- If the stack was not given, ask a THIRD \`question\`: "Which stack?" with:
+  ${STACKS.map((s) => `"${s}"`).join(", ")}.
+- Pick sensible stacks: Express/Next.js for TypeScript, FastAPI for Python,
+  "Vanilla" or an HTTP service for Rust.
+
+Wait for answers. Do not guess.
 
 ## 3. Fetch the source problem (private)
-Call the \`leetcode_fetch\` tool with the difficulty, and pass any requested topic
-as \`tags\` (array of slugs) — not as \`idOrSlug\`. Verify the returned topics
-include every requested tag; if not, retry. The fetched statement is for YOUR
-reasoning only. Never paste it, paraphrase it closely, or name its source anywhere
-in the generated project.
+Call \`leetcode_fetch\` with the difficulty, passing topics as \`tags\`. Verify the
+returned topics include every requested tag; retry if not. The statement is for
+YOUR reasoning only — never paste it or name its source anywhere.
 
 ## 4. Derive the principle
-Identify the underlying algorithmic idea (e.g. sliding window, heap-based
-scheduling, union-find, DP over intervals). Do not carry over the problem's
-fiction (arrays of "nums", "target", etc.).
+Identify the underlying algorithmic idea. Do not carry over the problem's fiction.
 
-## 5. Invent a real engineering scenario
-Design a plausible product/business task that genuinely needs that principle. Good
-domains: observability pipelines, payments/ledgering, logistics, rate limiting,
-access control, search, feature flags, data reconciliation, scheduling.
-The scenario must read like a ticket from a real team: who needs it, why, and what
-"correct" means.
+## 5. Build the assignment
+When the spec is ready, call the \`leetcode_scaffold\` tool. The two shapes differ:
 
-The assignment has ONE entry point with a JSON-in / JSON-out contract:
-- It receives a single JSON value (usually an object describing a request).
-- It returns a single JSON value (a response or result).
-This is how real services, CLIs and jobs exchange data, and it lets the same test
-harness verify any language.
+### A) scope = Quick exercise  -> mode "single"
+One entry point, JSON-in / JSON-out. Do NOT provide \`starterCode\` (the plugin
+generates typed/documented starters from your test cases). Spec: mode, title,
+scenario, pattern, difficulty, language, requirements, edgeCases, publicTests
+(5-8), hiddenTests (6-12), sourceSlug, sourceTitle.
 
-Call the tool \`leetcode_scaffold\` with a spec containing:
-- title: real-world project title (no coding-practice words)
-- scenario: 1-3 paragraphs of business context
-- pattern: the underlying principle (internal only)
-- language: the language the user chose (use the canonical id, e.g. "typescript",
-  "javascript", "python", "ruby", "php", "go", "rust", "csharp", "swift")
-- requirements: concrete, testable bullet points
-- edgeCases: tricky situations the solution must handle
-- Do NOT provide starterCode. Omit it so the plugin can generate a starter that
-  reflects the real types: type-safe languages get typed interfaces/structs and a
-  typed signature; dynamic languages get a documented input/output format comment.
-  The generated types are inferred from your publicTests/hiddenTests, so make the
-  first few cases representative of the full input shape (and vary fields so
-  optional ones are detected).
-- publicTests: 5-8 visible cases that illustrate the contract
-- hiddenTests: 6-12 acceptance cases, including edge cases, boundary values, an
-  empty/degenerate input, and at least one larger input
-- sourceSlug / sourceTitle: for internal provenance ONLY (never surfaced)
+### B) scope = Mini/Fuller project  -> mode "project" (${PROJECT_LANGUAGES.join(", ")})
+Build a REAL app in the chosen stack. The folder structure is entirely up to you
+— it is fluid, there is no template. The learner must implement ONE marked TODO
+that contains the algorithm; the rest must build and run.
 
-Test cases must be JSON-serialisable: \`{ "name": string, "input": any, "expected": any }\`.
-Make sure every \`expected\` value is actually correct for the described rules, and
-that public and hidden cases do not overlap.
+Design:
+- Create a genuine feature the algorithm powers (an endpoint, command, job, or
+  module), embedded in a believable app with a few real layers (entry, routing or
+  CLI, domain/service, models/types, small helpers). Respect the size: mini ~3-6
+  files, fuller ~6-15 files.
+- Leave exactly one \`TODO\` where the algorithm goes. It must be the ONLY thing
+  missing. Everything else compiles/runs.
+- Choose the interface based on the stack:
+
+  * Web/API stacks (Express, Next.js, FastAPI, any HTTP server): provide
+    \`startCommand\`, \`port\`, \`healthPath\` (a route that returns 200), and use
+    **HTTP test cases**. Every case is: { name, method, path, input (JSON body),
+    expected (JSON response body), status? }. Add install/build commands as needed
+    (\`installCommand\`, e.g. "npm install" / "python -m pip install -r requirements.txt";
+    \`buildCommand\` only if a build is required). The runner starts the server,
+    polls the health path, then sends the requests.
+  * Non-web stacks (CLI/library): provide \`runCommand\` (reads ONE JSON value on
+    stdin, writes ONE JSON value on stdout) and use stdio cases
+    { name, input, expected }.
+
+- Include everything needed to build/run you write as \`files\` (manifests, config,
+  source). No hidden dependencies beyond \`installCommand\`.
+- Import/runtime correctness:
+  - TypeScript under Node ESM type-stripping: relative imports MUST include the
+    \`.ts\` extension (\`import { x } from "./service.ts"\`). If you use a bundler/dev
+    server (Next.js), follow that stack's conventions instead.
+  - Python: make imports work when the entry runs as given by \`startCommand\`/\`runCommand\`.
+  - Rust: internal modules via \`mod ...;\` under \`src/\`.
+- Provide \`task\`: a short markdown brief naming the file(s) and function/route to implement.
+- Do NOT implement the TODO and do not reveal the algorithm in comments or commit messages.
+
+Both shapes:
+- requirements / edgeCases: concrete and testable
+- publicTests (5-8) and hiddenTests (6-12) as JSON-serialisable objects. Every
+  \`expected\` must be correct; public and hidden must not overlap. Include an
+  empty/degenerate case and a larger case.
+- \`sourceSlug\` / \`sourceTitle\`: provenance ONLY, never surfaced.
 
 ## 6. Rules (non-negotiable)
-- The generated title, scenario, requirements, comments, and test names MUST NOT
-  mention LeetCode, its title, its slug, or any coding-practice site. The
-  \`leetcode_scaffold\` tool will reject the spec if it does.
-- DO NOT implement the solution. Your job ends when the scaffold is written. The
-  learner implements the solution file themselves.
+- Titles, scenarios, requirements, comments, file contents and test names MUST NOT
+  mention LeetCode, its title, its slug, or any coding-practice site. The tool
+  rejects leaks, including inside \`files\`.
+- NEVER implement the algorithm (single: leave the entry unimplemented; project:
+  leave the TODO unimplemented).
 - Do not reveal the fetched problem or the original examples.
-- If the tool reports a leak, rewrite the offending fields and retry.
 
 ## 7. After scaffolding
 Report back with, in order:
-1. One short paragraph describing the assignment as a real task (no source spoilers).
-2. The project path and chosen language.
+1. One short paragraph describing the assignment as a real task (no spoilers).
+2. The project path, mode, stack, and language.
 3. The exact command to run the tests (\`node tests/runner.mjs\`).
-4. Note that \`tests/hidden/cases.json\` holds extra acceptance cases they should not edit.
+4. For project mode: the file(s) and function/route holding the TODO.
+5. Note that \`tests/hidden/cases.json\` holds extra acceptance cases they should not edit.
 Then stop. If the learner asks for help, give guiding hints and ask questions
 rather than writing the algorithm for them.
 `;

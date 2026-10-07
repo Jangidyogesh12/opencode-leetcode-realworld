@@ -92,11 +92,12 @@ function textsFromSpec(spec: ScaffoldSpec): Array<[string, string]> {
   push("scenario", spec.scenario);
   push("pattern", spec.pattern);
   push("functionName", spec.functionName);
-  push("starterCode", spec.starterCode);
+  push("task", spec.task);
   (spec.requirements ?? []).forEach((req, i) => push(`requirements[${i}]`, req));
   (spec.edgeCases ?? []).forEach((edge, i) => push(`edgeCases[${i}]`, edge));
   (spec.publicTests ?? []).forEach((test, i) => push(`publicTests[${i}].name`, test.name));
   (spec.hiddenTests ?? []).forEach((test, i) => push(`hiddenTests[${i}].name`, test.name));
+  (spec.files ?? []).forEach((file, i) => push(`files[${i}] (${file.path})`, file.content));
   return entries;
 }
 

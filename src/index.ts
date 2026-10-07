@@ -8,8 +8,15 @@ import type { ScaffoldSpec } from "./types";
 
 const testCaseSchema = tool.schema.object({
   name: tool.schema.string().describe("Short description of what the case asserts"),
-  input: tool.schema.any().describe("The single JSON-shaped payload passed to the entry function"),
-  expected: tool.schema.any().describe("The JSON-shaped value the entry function must return"),
+  input: tool.schema.any().optional().describe("stdio: JSON payload. http: JSON request body."),
+  expected: tool.schema.any().optional().describe("Expected JSON result/response body"),
+  method: tool.schema.string().optional().describe("http: method, e.g. POST (default GET)"),
+  path: tool.schema.string().optional().describe("http: request path, e.g. /api/events"),
+  status: tool.schema.number().optional().describe("http: expected status code (default 200)"),
+  headers: tool.schema
+    .record(tool.schema.string(), tool.schema.string())
+    .optional()
+    .describe("http: extra request headers"),
 });
 
 export const LeetCodeRealWorld: Plugin = async ({ client, directory }) => {
@@ -71,9 +78,15 @@ export const LeetCodeRealWorld: Plugin = async ({ client, directory }) => {
 
   const scaffoldTool = tool({
     description:
-      "Create a real-world practice project from a spec (scenario, requirements, starter, tests). " +
+      "Create a real-world practice project from a spec. " +
+      "Use mode \"single\" for one JSON-in/out function (any language) or mode \"project\" " +
+      "(typescript, python, rust) for a multi-file app where one TODO must be implemented. " +
       "Rejects any spec that leaks the original problem, its title, slug, or a coding-practice site name.",
     args: {
+      mode: tool.schema
+        .enum(["single", "project"])
+        .default("single")
+        .describe("single = one function; project = multi-file app (ts/python/rust)"),
       title: tool.schema.string().describe("Real-world project title (no coding-practice words)"),
       scenario: tool.schema.string().describe("Business context, written like a real ticket"),
       pattern: tool.schema.string().describe("Underlying algorithmic principle (internal only)"),
@@ -102,6 +115,39 @@ export const LeetCodeRealWorld: Plugin = async ({ client, directory }) => {
       outDir: tool.schema.string().optional().describe("Target directory, relative to the session directory"),
       sourceSlug: tool.schema.string().optional().describe("Provenance only; never surfaced"),
       sourceTitle: tool.schema.string().optional().describe("Provenance only; never surfaced"),
+      task: tool.schema
+        .string()
+        .optional()
+        .describe("Project mode: markdown brief telling the learner what to implement and where"),
+      files: tool.schema
+        .array(tool.schema.object({ path: tool.schema.string(), content: tool.schema.string() }))
+        .optional()
+        .describe("Project mode: the full file tree, leaving one TODO to implement"),
+      runCommand: tool.schema
+        .string()
+        .optional()
+        .describe("stdio project: command that runs one case (JSON on stdin, JSON on stdout)"),
+      buildCommand: tool.schema
+        .string()
+        .optional()
+        .describe("Project mode: optional one-time build command (e.g. `cargo build`)"),
+      installCommand: tool.schema
+        .string()
+        .optional()
+        .describe("Project mode: optional one-time install command (e.g. `npm install`)"),
+      startCommand: tool.schema
+        .string()
+        .optional()
+        .describe("http project: command that starts the server (enables HTTP test mode)"),
+      port: tool.schema.number().optional().describe("http project: server port (default 3000)"),
+      healthPath: tool.schema
+        .string()
+        .optional()
+        .describe("http project: readiness path the runner polls (default /)"),
+      stack: tool.schema
+        .string()
+        .optional()
+        .describe("Free-form stack label, e.g. express, nextjs, fastapi, vanilla"),
     },
     async execute(rawArgs, context) {
       const spec = rawArgs as ScaffoldSpec;
@@ -131,6 +177,7 @@ export const LeetCodeRealWorld: Plugin = async ({ client, directory }) => {
         `Created a real-world practice project at ${relative}`,
         "",
         `Title: ${result.title}`,
+        `Mode: ${result.mode}${result.mode === "project" ? ` (${result.kind}${result.stack ? `, ${result.stack}` : ""})` : ""}`,
         `Language: ${result.languageName} (${result.runtime})`,
         `Files (${result.files.length}):`,
         ...result.files.map((file) => `  - ${file}`),

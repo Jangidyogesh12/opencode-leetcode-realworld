@@ -76,6 +76,7 @@ Options can be given in any order; the command figures out which is which.
 | `tags` | One or more topic tags, comma-separated (e.g. `graph` or `dynamic-programming,sliding-window`) | any | Nudges which underlying algorithm and real-world domain you get. |
 | `<id-or-slug>` | A problem number or slug (e.g. `1`, `two-sum`) | random | Derive the assignment from one specific source problem. |
 | `language` | A supported language or alias (see below) | **asks you** | Language of the generated project and tests. |
+| `scope` | `single` \| `mini` \| `full` | **asks you** | How big the assignment is (see Two modes). |
 
 If you leave the language (or difficulty) out, opencode **asks you** with a
 multiple-choice question before generating anything.
@@ -150,16 +151,53 @@ they tend to produce:
 ```
 /practice
    │
-   ├─ (agent)             if language/difficulty are missing, ask you via the `question` tool
+   ├─ (agent)             ask you for language/difficulty, then how you want to start
    │
    ├─ leetcode_fetch      fetch a problem from the LeetCode API (private reasoning input)
    │
    ├─ (agent)             derive the principle -> invent a real-world scenario
    │
-   ├─ leetcode_scaffold   write README / PROJECT / starter / tests, reject any leak
+   ├─ leetcode_scaffold   write the exercises(s): one function, or a multi-file app
    │
    └─ guard hooks         block reading hidden tests + provenance, keep the exercise honest
 ```
+
+## Two modes
+
+`/practice` asks **how you want to start**, and the answer changes what gets built:
+
+| Scope | What you get |
+| --- | --- |
+| **Quick exercise** | One entry point with a JSON-in / JSON-out contract (any language). |
+| **Mini project** | A small multi-file app (~3-6 files) with the algorithm behind a single `TODO` (TypeScript, Python, Rust). |
+| **Fuller project** | A multi-file app with more realistic layers (~6-15 files) and the same single `TODO`. |
+
+In project mode you get a real little codebase — CLI entry or web server, domain
+types, service layer, wiring — where **everything works except one `TODO`**. You
+implement that piece (the algorithm) and `node tests/runner.mjs` verifies the app
+end-to-end.
+
+Project mode is available for **TypeScript, Python, Rust**; the other languages use
+the quick exercise.
+
+**Pick your stack.** In project mode it also asks for a stack:
+
+| Stack | Shape | How it's tested |
+| --- | --- | --- |
+| Vanilla (no framework) | CLI / library | JSON on stdin → JSON on stdout |
+| Express API (Node) | HTTP server | runner starts it and sends HTTP requests |
+| Next.js (React) | route handlers / API | runner starts it and sends HTTP requests |
+| FastAPI (Python) | HTTP server | runner starts it and sends HTTP requests |
+| Agent decides | whatever fits | inferred from the chosen shape |
+
+The folder structure is **not hardcoded** — the agent designs a layout that fits
+the stack and problem (`files`), so it feels like a real repo, not a template.
+
+For server projects, test cases are HTTP requests
+(`{ name, method, path, input, expected, status }`); the runner runs your
+`installCommand`, optional `buildCommand`, boots `startCommand`, waits on
+`healthPath`, then checks each request. For CLI/library projects it stays
+stdin/stdout.
 
 The generated project looks like this:
 

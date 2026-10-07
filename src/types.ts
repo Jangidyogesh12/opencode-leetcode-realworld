@@ -40,14 +40,34 @@ export interface NormalizedProblem {
 
 export interface TestCase {
   name: string;
-  input: unknown;
-  expected: unknown;
+  /** stdio: the JSON payload. http: the request body (ignored for GET/HEAD). */
+  input?: unknown;
+  /** stdio: expected result. http: expected JSON response body. */
+  expected?: unknown;
+  /** http only: HTTP method (default GET). */
+  method?: string;
+  /** http only: request path, e.g. "/api/events" (default "/"). */
+  path?: string;
+  /** http only: expected status code (default 200). */
+  status?: number;
+  /** http only: extra request headers. */
+  headers?: Record<string, string>;
 }
+
+export type HarnessKind = "stdio" | "http";
 
 export interface FileEntry {
   relative: string;
   contents: string;
 }
+
+/** A file the agent authored for a multi-file project. */
+export interface ProjectFile {
+  path: string;
+  content: string;
+}
+
+export type PracticeMode = "single" | "project";
 
 /**
  * The contract the agent fills in after it has decided on a real-world scenario.
@@ -55,6 +75,10 @@ export interface FileEntry {
  * before writing anything to disk.
  */
 export interface ScaffoldSpec {
+  /** `single` = one JSON-in/out function. `project` = a multi-file app. */
+  mode?: PracticeMode;
+  /** Free-form stack label, e.g. "express", "nextjs", "fastapi", "vanilla". */
+  stack?: string;
   /** kebab-case directory name. Derived from `title` when omitted. */
   projectName?: string;
   /** Human title of the *real-world* project, e.g. "Realtime Dedup Pipeline". */
@@ -69,7 +93,7 @@ export interface ScaffoldSpec {
   functionName?: string;
   requirements?: string[];
   edgeCases?: string[];
-  /** Optional starter implementation. A TODO stub is generated when omitted. */
+  /** Optional starter implementation (single mode). A TODO stub is generated when omitted. */
   starterCode?: string;
   publicTests?: TestCase[];
   hiddenTests?: TestCase[];
@@ -78,6 +102,24 @@ export interface ScaffoldSpec {
   /** Internal provenance, stored in `.practice-meta.json` only. Never leaked. */
   sourceSlug?: string;
   sourceTitle?: string;
+
+  // --- project mode -------------------------------------------------------
+  /** The full file tree for a project-mode assignment. */
+  files?: ProjectFile[];
+  /** Markdown brief for the learner: what to implement and where. */
+  task?: string;
+  /** stdio project: command that runs one case (JSON stdin -> JSON stdout). */
+  runCommand?: string;
+  /** Optional one-time install command (e.g. `npm install`, `pip install -r req.txt`). */
+  installCommand?: string;
+  /** Optional one-time build command (e.g. `cargo build`, `npm run build`). */
+  buildCommand?: string;
+  /** http project: command that starts the server. */
+  startCommand?: string;
+  /** http project: port the server listens on (default 3000). */
+  port?: number;
+  /** http project: path used to poll readiness (default "/"). */
+  healthPath?: string;
 }
 
 export interface ScaffoldResult {
@@ -86,6 +128,9 @@ export interface ScaffoldResult {
   language: LanguageId;
   languageName: string;
   runtime: string;
+  mode: PracticeMode;
+  kind: HarnessKind;
+  stack?: string;
   files: string[];
   runCommand: string;
   checkCommand: string;
