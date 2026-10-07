@@ -1,0 +1,5 @@
+node_modules/
+.practice/
+*.log
+.DS_Store
+.opencode

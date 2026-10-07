@@ -1,0 +1,35 @@
+{
+  "name": "opencode-leetcode-realworld",
+  "version": "0.2.0",
+  "description": "OpenCode plugin that turns a LeetCode problem into a realistic software-engineering assignment, so you practice applying the underlying algorithm instead of solving the puzzle.",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "leetcode",
+    "practice",
+    "interview",
+    "algorithms"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/node": "^22.13.9",
+    "typescript": "^5.8.2"
+  }
+}
